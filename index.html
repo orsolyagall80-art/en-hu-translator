@@ -9,18 +9,37 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); display: flex; align-items: center; justify-content: center; padding: 1rem; }
-    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    @keyframes ping {
+      75%, 100% { transform: scale(2); opacity: 0; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     .ping { animation: ping 1.2s cubic-bezier(0,0,0.2,1) infinite; }
     .spin { animation: spin 0.8s linear infinite; }
-    select { appearance: none; -webkit-appearance: none; background: rgba(109,40,217,0.35); border: 1px solid rgba(139,92,246,0.55); color: white; font-size: 15px; font-weight: 600; padding: 8px 32px 8px 12px; border-radius: 999px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+    select {
+      appearance: none; -webkit-appearance: none;
+      background: rgba(109,40,217,0.35);
+      border: 1px solid rgba(139,92,246,0.55);
+      color: white; border-radius: 10px;
+      padding: 6px 28px 6px 10px; font-size: 15px; font-weight: 600;
+      cursor: pointer; outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c4b5fd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
     select option { background: #312e81; color: white; }
-    select:focus { outline: none; border-color: rgba(167,139,250,0.8); }
   </style>
 </head>
 <body>
 <div id="root"></div>
+
 <script type="text/babel">
 const { useState, useRef, useCallback, useEffect } = React;
 
@@ -31,58 +50,115 @@ const LANG = {
 };
 const LANG_KEYS = Object.keys(LANG);
 
-// Question word patterns per language
-const QUESTION_PATTERNS = {
-  en: /^(who|what|where|when|why|how|is|are|am|was|were|do|does|did|can|could|would|should|will|shall|have|has|had|may|might|must|isn't|aren't|doesn't|didn't|won't|can't|couldn't|wouldn't|haven't|hasn't)/i,
-  hu: /^(ki|kik|mit|mi|mikor|miért|hogyan|hogy|hol|melyik|mennyi|mennyit|merre|meddig|mikorra|miből|miben|mire|mihez|mivel|van-e|lehet-e|kell|szabad|lesz|megy|jön|tud|akar|fog)/i,
-  es: /^(quién|quiénes|qué|dónde|cuándo|por qué|cómo|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|es|son|está|están|hay|tiene|tienen|puede|pueden|podría|sería|será|es que|a qué)/i,
-};
+/* ── Question detection ── */
+const EN_Q = /^(who|what|where|when|why|how|is|are|am|was|were|do|does|did|can|could|would|should|will|shall|have|has|had|may|might|must|isn't|aren't|doesn't|didn't|won't|can't|couldn't|wouldn't|haven't|hasn't)\s/i;
+const ES_Q = /^(quién|quiénes|qué|dónde|cuándo|por qué|cómo|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|es|son|está|están|hay|tiene|tienen|puede|pueden|podría|sería|será)\s/i;
+
+const HU_Q_STARTERS = [
+  "ki ","kik ","kit ","kinek ","kiről ","kivel ",
+  "mi ","mit ","mikor ","miért ","mibe ","miben ","miből ","mire ",
+  "mihez ","mivel ","miről ","mióta ",
+  "hogyan ","hogy ","hol ","honnan ","hová ","hova ",
+  "melyik ","melyiket ","melyikkel ",
+  "mennyi ","mennyit ","mennyibe ","mennyiért ",
+  "merre ","meddig ","mikorra ","mikortól ",
+  "van ","vannak ","volt ","volt-e ","nincs ","nincsen ","nincsenek ",
+  "igaz ","igaz-e ","lehet ","szabad ","kell ","muszáj ",
+  "lesz ","lenne ","lesznek ",
+  "megy ","mennek ","jön ","jönnek ",
+  "tud ","tudnak ","tudsz ","tudtok ",
+  "akar ","akarnak ","akarsz ",
+  "fog ","fognak ","fogsz ",
+  "eljössz ","eljön ","eljönnél ",
+  "elmégy ","elmegy ","elmennél ",
+  "szeretsz ","szeret ","szeretnek ","szeretnéd ","szeretnéd-e ",
+];
+
+function isQuestion(text, langKey) {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+
+  if (langKey === "hu") {
+    for (const starter of HU_Q_STARTERS) {
+      if (t.startsWith(starter)) return true;
+    }
+    const firstWord = t.split(/\s+/)[0].replace(/[.,!?;]+$/, "");
+    const singleWordQ = ["ki","kik","mi","mit","mikor","miért","hogyan","hogy","hol","melyik","mennyi","merre","van","nincs","igaz","lesz","tud","lehet"];
+    if (singleWordQ.includes(firstWord)) return true;
+    if (/-e(\s|$|[.,!?])/.test(t)) return true;
+    if (t.endsWith("-e")) return true;
+    if (t.endsWith("?")) return true;
+    return false;
+  }
+
+  if (langKey === "en") return EN_Q.test(t + " ");
+  if (langKey === "es") return ES_Q.test(t + " ");
+  return false;
+}
 
 function addPunctuation(text, langKey) {
   const t = text.trim();
   if (!t) return t;
-  // Already ends with punctuation — leave it alone
   if (/[.!?,;]$/.test(t)) return t;
-  // Check for question words in source language
-  const pattern = QUESTION_PATTERNS[langKey];
-  if (pattern && pattern.test(t)) return t + '?';
-  return t + '.';
+  return isQuestion(t, langKey) ? t + "?" : t + ".";
 }
 
+/* ── Icons ── */
 function MicIcon({ active }) {
   const col = active ? "#ffffff" : "#c4b5fd";
-  return (<svg viewBox="0 0 24 24" fill="none" width="44" height="44"><rect x="9" y="2" width="6" height="12" rx="3" fill={col}/><path d="M5 11a7 7 0 0014 0" stroke={col} strokeWidth="2" strokeLinecap="round" fill="none"/><line x1="12" y1="18" x2="12" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/></svg>);
-}
-function SpeakerIcon({ active }) {
-  const col = active ? "#7c3aed" : "#a78bfa";
-  return (<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M11 5L6 9H2v6h4l5 4V5z" fill={col}/><path d="M15.54 8.46a5 5 0 010 7.07" stroke={col} strokeWidth="2" strokeLinecap="round"/><path d="M19.07 4.93a10 10 0 010 14.14" stroke={col} strokeWidth="2" strokeLinecap="round"/></svg>);
-}
-function SwapIcon() {
-  return (<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>);
+  return (
+    <svg viewBox="0 0 24 24" fill="none" width="44" height="44">
+      <rect x="9" y="2" width="6" height="12" rx="3" fill={col}/>
+      <path d="M5 11a7 7 0 0014 0" stroke={col} strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <line x1="12" y1="18" x2="12" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="8"  y1="22" x2="16" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
 }
 
+function SpeakerIcon({ active }) {
+  const col = active ? "#7c3aed" : "#a78bfa";
+  return (
+    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+      <path d="M11 5L6 9H2v6h4l5 4V5z" fill={col}/>
+      <path d="M15.54 8.46a5 5 0 010 7.07" stroke={col} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M19.07 4.93a10 10 0 010 14.14" stroke={col} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+/* ── Main component ── */
 function Translator() {
-  const [source, setSource] = useState("en");
-  const [target, setTarget] = useState("hu");
-  const [transcript, setTranscript] = useState("");
+  const [source, setSource]           = useState("en");
+  const [target, setTarget]           = useState("hu");
+  const [transcript, setTranscript]   = useState("");
   const [translation, setTranslation] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [error, setError] = useState("");
-  const [supported, setSupported] = useState(true);
-  const recognitionRef = useRef(null);
-  const lastTranscriptRef = useRef("");
-  const didTranslateRef = useRef(false);
+  const [isSpeaking, setIsSpeaking]   = useState(false);
+  const [error, setError]             = useState("");
+  const [supported, setSupported]     = useState(true);
 
-  useEffect(() => { if (!window.SpeechRecognition && !window.webkitSpeechRecognition) setSupported(false); }, []);
+  const recognitionRef    = useRef(null);
+  const lastTranscriptRef = useRef("");
+  const didTranslateRef   = useRef(false);
+  const sourceRef         = useRef(source);
+  const targetRef         = useRef(target);
+
+  useEffect(() => { sourceRef.current = source; }, [source]);
+  useEffect(() => { targetRef.current = target; }, [target]);
+
+  useEffect(() => {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) setSupported(false);
+  }, []);
 
   const speakText = useCallback((text, bcp) => {
-    const synth = window.speechSynthesis; synth.cancel();
+    const synth = window.speechSynthesis;
+    synth.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = bcp; utt.rate = 0.92;
     utt.onstart = () => setIsSpeaking(true);
-    utt.onend = () => setIsSpeaking(false);
+    utt.onend   = () => setIsSpeaking(false);
     utt.onerror = () => setIsSpeaking(false);
     synth.speak(utt);
   }, []);
@@ -94,107 +170,235 @@ function Translator() {
     setIsTranslating(true); setError("");
     try {
       const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(punctuated)}&langpair=${LANG[src].mm}|${LANG[tgt].mm}`;
-      const res = await fetch(url);
+      const res  = await fetch(url);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      const out = data?.responseData?.translatedText;
+      const out  = data?.responseData?.translatedText;
       if (!out) throw new Error();
-      setTranslation(out); speakText(out, LANG[tgt].bcp);
-    } catch { setError("Translation failed — check your connection and try again."); }
-    finally { setIsTranslating(false); }
+      setTranslation(out);
+      speakText(out, LANG[tgt].bcp);
+    } catch {
+      setError("Translation failed — check your connection and try again.");
+    } finally { setIsTranslating(false); }
   }, [speakText]);
 
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setSupported(false); return; }
-    setError(""); setTranscript(""); setTranslation(""); window.speechSynthesis.cancel();
-    lastTranscriptRef.current = ""; didTranslateRef.current = false;
+    setError(""); setTranscript(""); setTranslation("");
+    window.speechSynthesis.cancel();
+    lastTranscriptRef.current = "";
+    didTranslateRef.current   = false;
+
     const r = new SR();
-    r.lang = LANG[source].bcp; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+    r.lang = LANG[sourceRef.current].bcp;
+    r.interimResults = true;
+    r.continuous = false;
+    r.maxAlternatives = 1;
+
     r.onresult = (e) => {
-      const res = e.results[e.resultIndex];
+      const res  = e.results[e.resultIndex];
       const text = res[0].transcript;
       lastTranscriptRef.current = text;
-      setTranscript(text); // show raw interim text while speaking
-      if (res.isFinal) { didTranslateRef.current = true; doTranslate(text, source, target); }
+      setTranscript(text);
+      if (res.isFinal) {
+        didTranslateRef.current = true;
+        doTranslate(text, sourceRef.current, targetRef.current);
+      }
     };
-    r.onerror = (e) => { if (e.error !== "aborted") setError(`Mic error: ${e.error}. Please allow microphone access.`); setIsListening(false); };
+    r.onerror = (e) => {
+      if (e.error !== "aborted") setError(`Mic error: ${e.error}. Please allow microphone access.`);
+      setIsListening(false);
+    };
     r.onend = () => {
       setIsListening(false);
-      if (!didTranslateRef.current && lastTranscriptRef.current.trim()) doTranslate(lastTranscriptRef.current, source, target);
-      lastTranscriptRef.current = ""; didTranslateRef.current = false;
+      if (!didTranslateRef.current && lastTranscriptRef.current.trim()) {
+        doTranslate(lastTranscriptRef.current, sourceRef.current, targetRef.current);
+      }
+      lastTranscriptRef.current = "";
+      didTranslateRef.current   = false;
     };
-    recognitionRef.current = r; r.start(); setIsListening(true);
-  }, [source, target, doTranslate]);
 
-  const stopListening = useCallback(() => { recognitionRef.current?.stop(); setIsListening(false); }, []);
+    recognitionRef.current = r;
+    r.start();
+    setIsListening(true);
+  }, [doTranslate]);
 
-  const handleSwap = () => {
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
+
+  const handleSourceChange = (e) => {
     if (isListening) stopListening();
     window.speechSynthesis.cancel();
-    setSource(target); setTarget(source);
+    const newSrc = e.target.value;
+    setSource(newSrc);
+    if (newSrc === target) {
+      const other = LANG_KEYS.find(k => k !== newSrc);
+      setTarget(other);
+    }
     setTranscript(""); setTranslation(""); setError("");
   };
 
-  const handleSourceChange = (e) => {
-    const val = e.target.value;
-    if (isListening) stopListening();
-    window.speechSynthesis.cancel();
-    if (val === target) setTarget(source);
-    setSource(val); setTranscript(""); setTranslation(""); setError("");
-  };
-
   const handleTargetChange = (e) => {
-    const val = e.target.value;
     if (isListening) stopListening();
     window.speechSynthesis.cancel();
-    if (val === source) setSource(target);
-    setTarget(val); setTranscript(""); setTranslation(""); setError("");
+    const newTgt = e.target.value;
+    setTarget(newTgt);
+    if (newTgt === source) {
+      const other = LANG_KEYS.find(k => k !== newTgt);
+      setSource(other);
+    }
+    setTranscript(""); setTranslation(""); setError("");
   };
 
   const s = LANG[source], t = LANG[target];
-  const card = { background:"rgba(255,255,255,0.06)", backdropFilter:"blur(16px)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:28, overflow:"hidden", boxShadow:"0 24px 64px rgba(0,0,0,0.4)" };
-  const box = (h) => ({ background:h?"rgba(109,40,217,0.25)":"rgba(0,0,0,0.2)", border:h?"1px solid rgba(139,92,246,0.3)":"none", borderRadius:16, padding:"14px 16px", minHeight:80, fontSize:18, lineHeight:1.55, color:"white", marginTop:8 });
-  const micBtn = { width:84, height:84, borderRadius:"50%", background:isListening?"linear-gradient(135deg,#7c3aed,#6d28d9)":"linear-gradient(135deg,#4c1d95,#5b21b6)", border:"2px solid rgba(167,139,250,0.4)", boxShadow:isListening?"0 0 0 14px rgba(139,92,246,0.18),0 8px 32px rgba(109,40,217,0.5)":"0 8px 32px rgba(109,40,217,0.4)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", transition:"all 0.2s" };
-  const swapBtn = { display:"flex", alignItems:"center", gap:5, padding:"7px 12px", borderRadius:999, background:"rgba(139,92,246,0.35)", border:"1px solid rgba(139,92,246,0.55)", color:"white", cursor:"pointer", fontSize:12, fontWeight:600, flexShrink:0 };
-  const replayBtn = { display:"flex", alignItems:"center", gap:4, padding:"4px 10px", borderRadius:999, background:"rgba(139,92,246,0.22)", border:"1px solid rgba(139,92,246,0.38)", color:"#c4b5fd", cursor:"pointer", fontSize:12, fontWeight:500 };
-  const lbl = { fontSize:11, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(196,181,253,0.65)" };
+
+  const card = {
+    background: "rgba(255,255,255,0.06)",
+    backdropFilter: "blur(16px)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 28, overflow: "hidden",
+    boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+  };
+  const box = (highlight) => ({
+    background: highlight ? "rgba(109,40,217,0.25)" : "rgba(0,0,0,0.2)",
+    border: highlight ? "1px solid rgba(139,92,246,0.3)" : "none",
+    borderRadius: 16, padding: "14px 16px",
+    minHeight: 80, fontSize: 18, lineHeight: 1.55,
+    color: "white", marginTop: 8,
+  });
+  const micBtn = {
+    width: 84, height: 84, borderRadius: "50%",
+    background: isListening
+      ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
+      : "linear-gradient(135deg,#4c1d95,#5b21b6)",
+    border: "2px solid rgba(167,139,250,0.4)",
+    boxShadow: isListening
+      ? "0 0 0 14px rgba(139,92,246,0.18),0 0 0 28px rgba(139,92,246,0.07),0 8px 32px rgba(109,40,217,0.5)"
+      : "0 8px 32px rgba(109,40,217,0.4)",
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+    position: "relative", transition: "all 0.2s",
+  };
+  const replayBtn = {
+    display:"flex", alignItems:"center", gap:4,
+    padding:"4px 10px", borderRadius:999,
+    background:"rgba(139,92,246,0.22)", border:"1px solid rgba(139,92,246,0.38)",
+    color:"#c4b5fd", cursor:"pointer", fontSize:12, fontWeight:500,
+  };
+  const lbl = {
+    fontSize:11, fontWeight:700, letterSpacing:"0.1em",
+    textTransform:"uppercase", color:"rgba(196,181,253,0.65)",
+  };
 
   return (
-    <div style={{width:"100%",maxWidth:440}}>
-      <div style={{textAlign:"center",marginBottom:32}}>
-        <h1 style={{color:"white",fontSize:30,fontWeight:700,letterSpacing:"-0.5px"}}>Live Translator</h1>
-        <p style={{color:"#a78bfa",marginTop:4,fontSize:14}}>Speak · Translate · Listen</p>
+    <div style={{width:"100%", maxWidth:440}}>
+      <div style={{textAlign:"center", marginBottom:32}}>
+        <h1 style={{color:"white", fontSize:30, fontWeight:700, letterSpacing:"-0.5px"}}>Live Translator</h1>
+        <p style={{color:"#a78bfa", marginTop:4, fontSize:14}}>Speak · Translate · Listen</p>
       </div>
+
       <div style={card}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-          <select value={source} onChange={handleSourceChange} aria-label="Source language">
-            {LANG_KEYS.map(k => <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>)}
-          </select>
-          <button style={swapBtn} onClick={handleSwap} title="Swap languages"><SwapIcon/> Swap</button>
-          <select value={target} onChange={handleTargetChange} aria-label="Target language">
-            {LANG_KEYS.map(k => <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>)}
-          </select>
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"16px 24px", borderBottom:"1px solid rgba(255,255,255,0.1)", gap:8}}>
+          <div style={{display:"flex", flexDirection:"column", gap:3}}>
+            <span style={{...lbl}}>From</span>
+            <select value={source} onChange={handleSourceChange}>
+              {LANG_KEYS.map(k => (
+                <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{color:"rgba(167,139,250,0.6)", fontSize:20, fontWeight:300, paddingTop:14}}>→</div>
+          <div style={{display:"flex", flexDirection:"column", gap:3, alignItems:"flex-end"}}>
+            <span style={{...lbl}}>To</span>
+            <select value={target} onChange={handleTargetChange}>
+              {LANG_KEYS.map(k => (
+                <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <div style={{padding:"20px 24px 0"}}>
           <div style={lbl}>{s.flag} You said</div>
-          <div style={box(false)}>{transcript?transcript:<span style={{color:"#8b5cf6",fontStyle:"italic",fontSize:15}}>{isListening?"Listening…":"Press the button below and speak"}</span>}</div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:18}}>
-            <div style={lbl}>{t.flag} Translation</div>
-            {translation&&(<button style={replayBtn} onClick={()=>speakText(translation,t.bcp)}><SpeakerIcon active={isSpeaking}/>{isSpeaking?"Playing…":"Replay"}</button>)}
+          <div style={box(false)}>
+            {transcript
+              ? transcript
+              : <span style={{color:"#8b5cf6", fontStyle:"italic", fontSize:15}}>
+                  {isListening ? "Listening…" : "Press the button below and speak"}
+                </span>}
           </div>
-          <div style={box(true)}>{isTranslating?<span style={{color:"#a78bfa",display:"flex",alignItems:"center",gap:8}}><svg className="spin" viewBox="0 0 24 24" fill="none" width="16" height="16"><circle cx="12" cy="12" r="10" stroke="#a78bfa" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 019.7 7.5" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round"/></svg>Translating…</span>:translation?<span style={{fontWeight:500}}>{translation}</span>:<span style={{color:"#8b5cf6",fontStyle:"italic",fontSize:15}}>Translation will appear here</span>}</div>
+
+          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:18}}>
+            <div style={lbl}>{t.flag} Translation</div>
+            {translation && (
+              <button style={replayBtn} onClick={() => speakText(translation, t.bcp)}>
+                <SpeakerIcon active={isSpeaking}/>
+                {isSpeaking ? "Playing…" : "Replay"}
+              </button>
+            )}
+          </div>
+          <div style={box(true)}>
+            {isTranslating
+              ? <span style={{color:"#a78bfa", display:"flex", alignItems:"center", gap:8}}>
+                  <svg className="spin" viewBox="0 0 24 24" fill="none" width="16" height="16">
+                    <circle cx="12" cy="12" r="10" stroke="#a78bfa" strokeWidth="3" strokeOpacity="0.3"/>
+                    <path d="M12 2a10 10 0 019.7 7.5" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                  Translating…
+                </span>
+              : translation
+                ? <span style={{fontWeight:500}}>{translation}</span>
+                : <span style={{color:"#8b5cf6", fontStyle:"italic", fontSize:15}}>Translation will appear here</span>}
+          </div>
         </div>
-        {error&&(<div style={{margin:"12px 24px 0",padding:"10px 14px",borderRadius:12,fontSize:13,background:"rgba(220,38,38,0.18)",border:"1px solid rgba(248,113,113,0.3)",color:"#fca5a5"}}>{error}</div>)}
-        <div style={{padding:"28px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-          {!supported?<p style={{color:"#a78bfa",textAlign:"center",fontSize:14,padding:"0 24px"}}>Speech recognition requires <strong>Safari</strong> on iPhone or <strong>Chrome/Edge</strong> on desktop.</p>:
-          <><div style={{position:"relative"}}>{isListening&&<span className="ping" style={{position:"absolute",inset:0,borderRadius:"50%",background:"rgba(139,92,246,0.35)",display:"block"}}/>}<button style={micBtn} onMouseDown={startListening} onMouseUp={stopListening} onTouchStart={(e)=>{e.preventDefault();startListening();}} onTouchEnd={(e)=>{e.preventDefault();stopListening();}} onClick={isListening?stopListening:startListening}><MicIcon active={isListening}/></button></div><p style={{color:"#a78bfa",fontSize:14}}>{isListening?"Release to stop":`Tap & speak in ${s.label}`}</p></>}
+
+        {error && (
+          <div style={{margin:"12px 24px 0", padding:"10px 14px", borderRadius:12, fontSize:13,
+            background:"rgba(220,38,38,0.18)", border:"1px solid rgba(248,113,113,0.3)", color:"#fca5a5"}}>
+            {error}
+          </div>
+        )}
+
+        <div style={{padding:"28px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:12}}>
+          {!supported
+            ? <p style={{color:"#a78bfa", textAlign:"center", fontSize:14, padding:"0 24px"}}>
+                Speech recognition requires <strong>Chrome</strong> or <strong>Edge</strong>.<br/>
+                Please open this file in one of those browsers.
+              </p>
+            : <>
+                <div style={{position:"relative"}}>
+                  {isListening && (
+                    <span className="ping" style={{
+                      position:"absolute", inset:0, borderRadius:"50%",
+                      background:"rgba(139,92,246,0.35)", display:"block",
+                    }}/>
+                  )}
+                  <button
+                    style={micBtn}
+                    onMouseDown={startListening}
+                    onMouseUp={stopListening}
+                    onTouchStart={(e)=>{e.preventDefault();startListening();}}
+                    onTouchEnd={(e)=>{e.preventDefault();stopListening();}}>
+                    <MicIcon active={isListening}/>
+                  </button>
+                </div>
+                <p style={{color:"#a78bfa", fontSize:14}}>
+                  {isListening ? "Release to stop" : `Tap & speak in ${s.label}`}
+                </p>
+              </>}
         </div>
       </div>
-      <p style={{textAlign:"center",color:"rgba(139,92,246,0.5)",fontSize:11,marginTop:20}}>Powered by Web Speech API · MyMemory Translation</p>
+
+      <p style={{textAlign:"center", color:"rgba(139,92,246,0.5)", fontSize:11, marginTop:20}}>
+        Powered by Web Speech API · MyMemory Translation
+      </p>
     </div>
   );
 }
+
 ReactDOM.createRoot(document.getElementById("root")).render(<Translator/>);
 </script>
 </body>
