@@ -31,6 +31,24 @@ const LANG = {
 };
 const LANG_KEYS = Object.keys(LANG);
 
+// Question word patterns per language
+const QUESTION_PATTERNS = {
+  en: /^(who|what|where|when|why|how|is|are|am|was|were|do|does|did|can|could|would|should|will|shall|have|has|had|may|might|must|isn't|aren't|doesn't|didn't|won't|can't|couldn't|wouldn't|haven't|hasn't)/i,
+  hu: /^(ki|kik|mit|mi|mikor|miért|hogyan|hogy|hol|melyik|mennyi|mennyit|merre|meddig|mikorra|miből|miben|mire|mihez|mivel|van-e|lehet-e|kell|szabad|lesz|megy|jön|tud|akar|fog)/i,
+  es: /^(quién|quiénes|qué|dónde|cuándo|por qué|cómo|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|es|son|está|están|hay|tiene|tienen|puede|pueden|podría|sería|será|es que|a qué)/i,
+};
+
+function addPunctuation(text, langKey) {
+  const t = text.trim();
+  if (!t) return t;
+  // Already ends with punctuation — leave it alone
+  if (/[.!?,;]$/.test(t)) return t;
+  // Check for question words in source language
+  const pattern = QUESTION_PATTERNS[langKey];
+  if (pattern && pattern.test(t)) return t + '?';
+  return t + '.';
+}
+
 function MicIcon({ active }) {
   const col = active ? "#ffffff" : "#c4b5fd";
   return (<svg viewBox="0 0 24 24" fill="none" width="44" height="44"><rect x="9" y="2" width="6" height="12" rx="3" fill={col}/><path d="M5 11a7 7 0 0014 0" stroke={col} strokeWidth="2" strokeLinecap="round" fill="none"/><line x1="12" y1="18" x2="12" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/></svg>);
@@ -71,9 +89,11 @@ function Translator() {
 
   const doTranslate = useCallback(async (text, src, tgt) => {
     if (!text.trim()) return;
+    const punctuated = addPunctuation(text, src);
+    setTranscript(punctuated);
     setIsTranslating(true); setError("");
     try {
-      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${LANG[src].mm}|${LANG[tgt].mm}`;
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(punctuated)}&langpair=${LANG[src].mm}|${LANG[tgt].mm}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -94,7 +114,8 @@ function Translator() {
     r.onresult = (e) => {
       const res = e.results[e.resultIndex];
       const text = res[0].transcript;
-      lastTranscriptRef.current = text; setTranscript(text);
+      lastTranscriptRef.current = text;
+      setTranscript(text); // show raw interim text while speaking
       if (res.isFinal) { didTranslateRef.current = true; doTranslate(text, source, target); }
     };
     r.onerror = (e) => { if (e.error !== "aborted") setError(`Mic error: ${e.error}. Please allow microphone access.`); setIsListening(false); };
@@ -146,7 +167,6 @@ function Translator() {
         <p style={{color:"#a78bfa",marginTop:4,fontSize:14}}>Speak · Translate · Listen</p>
       </div>
       <div style={card}>
-        {/* Language bar */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <select value={source} onChange={handleSourceChange} aria-label="Source language">
             {LANG_KEYS.map(k => <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>)}
@@ -156,7 +176,6 @@ function Translator() {
             {LANG_KEYS.map(k => <option key={k} value={k}>{LANG[k].flag} {LANG[k].label}</option>)}
           </select>
         </div>
-
         <div style={{padding:"20px 24px 0"}}>
           <div style={lbl}>{s.flag} You said</div>
           <div style={box(false)}>{transcript?transcript:<span style={{color:"#8b5cf6",fontStyle:"italic",fontSize:15}}>{isListening?"Listening…":"Press the button below and speak"}</span>}</div>
@@ -166,9 +185,7 @@ function Translator() {
           </div>
           <div style={box(true)}>{isTranslating?<span style={{color:"#a78bfa",display:"flex",alignItems:"center",gap:8}}><svg className="spin" viewBox="0 0 24 24" fill="none" width="16" height="16"><circle cx="12" cy="12" r="10" stroke="#a78bfa" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 019.7 7.5" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round"/></svg>Translating…</span>:translation?<span style={{fontWeight:500}}>{translation}</span>:<span style={{color:"#8b5cf6",fontStyle:"italic",fontSize:15}}>Translation will appear here</span>}</div>
         </div>
-
         {error&&(<div style={{margin:"12px 24px 0",padding:"10px 14px",borderRadius:12,fontSize:13,background:"rgba(220,38,38,0.18)",border:"1px solid rgba(248,113,113,0.3)",color:"#fca5a5"}}>{error}</div>)}
-
         <div style={{padding:"28px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
           {!supported?<p style={{color:"#a78bfa",textAlign:"center",fontSize:14,padding:"0 24px"}}>Speech recognition requires <strong>Safari</strong> on iPhone or <strong>Chrome/Edge</strong> on desktop.</p>:
           <><div style={{position:"relative"}}>{isListening&&<span className="ping" style={{position:"absolute",inset:0,borderRadius:"50%",background:"rgba(139,92,246,0.35)",display:"block"}}/>}<button style={micBtn} onMouseDown={startListening} onMouseUp={stopListening} onTouchStart={(e)=>{e.preventDefault();startListening();}} onTouchEnd={(e)=>{e.preventDefault();stopListening();}} onClick={isListening?stopListening:startListening}><MicIcon active={isListening}/></button></div><p style={{color:"#a78bfa",fontSize:14}}>{isListening?"Release to stop":`Tap & speak in ${s.label}`}</p></>}
