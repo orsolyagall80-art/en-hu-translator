@@ -1,45 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Translator</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
-      display: flex; align-items: center; justify-content: center; padding: 1rem;
-    }
-    @keyframes ping {
-      75%, 100% { transform: scale(2); opacity: 0; }
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .ping { animation: ping 1.2s cubic-bezier(0,0,0.2,1) infinite; }
-    .spin { animation: spin 0.8s linear infinite; }
-    select {
-      appearance: none; -webkit-appearance: none;
-      background: rgba(109,40,217,0.35);
-      border: 1px solid rgba(139,92,246,0.55);
-      color: white; border-radius: 10px;
-      padding: 6px 28px 6px 10px; font-size: 15px; font-weight: 600;
-      cursor: pointer; outline: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c4b5fd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 8px center;
-    }
-    select option { background: #312e81; color: white; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live Translator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.ping { animation: ping 1.2s cubic-bezier(0,0,0.2,1) infinite; }
+.spin { animation: spin 0.8s linear infinite; }
+select {
+  appearance: none; -webkit-appearance: none;
+  background: rgba(109,40,217,0.35);
+  border: 1px solid rgba(139,92,246,0.55);
+  color: white; border-radius: 10px;
+  padding: 6px 28px 6px 10px; font-size: 15px; font-weight: 600;
+  cursor: pointer; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c4b5fd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+select option { background: #312e81; color: white; }
+/* Prevent iOS double-tap zoom / callout on mic button */
+button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+</style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
 const { useState, useRef, useCallback, useEffect } = React;
 
@@ -53,7 +54,6 @@ const LANG_KEYS = Object.keys(LANG);
 /* ── Question detection ── */
 const EN_Q = /^(who|what|where|when|why|how|is|are|am|was|were|do|does|did|can|could|would|should|will|shall|have|has|had|may|might|must|isn't|aren't|doesn't|didn't|won't|can't|couldn't|wouldn't|haven't|hasn't)\s/i;
 const ES_Q = /^(quién|quiénes|qué|dónde|cuándo|por qué|cómo|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|es|son|está|están|hay|tiene|tienen|puede|pueden|podría|sería|será)\s/i;
-
 const HU_Q_STARTERS = [
   "ki ","kik ","kit ","kinek ","kiről ","kivel ",
   "mi ","mit ","mikor ","miért ","mibe ","miben ","miből ","mire ",
@@ -77,7 +77,6 @@ const HU_Q_STARTERS = [
 function isQuestion(text, langKey) {
   const t = text.trim().toLowerCase();
   if (!t) return false;
-
   if (langKey === "hu") {
     for (const starter of HU_Q_STARTERS) {
       if (t.startsWith(starter)) return true;
@@ -90,7 +89,6 @@ function isQuestion(text, langKey) {
     if (t.endsWith("?")) return true;
     return false;
   }
-
   if (langKey === "en") return EN_Q.test(t + " ");
   if (langKey === "es") return ES_Q.test(t + " ");
   return false;
@@ -103,6 +101,26 @@ function addPunctuation(text, langKey) {
   return isQuestion(t, langKey) ? t + "?" : t + ".";
 }
 
+/* ── Unlock speech synthesis on first user gesture.
+      Mobile browsers (iOS Safari, Android Chrome) block speechSynthesis.speak()
+      unless it has been triggered at least once from inside a user gesture.
+      Because our real .speak() call happens AFTER an async fetch (no longer
+      inside the gesture), the first translation would never be spoken.
+      Priming with a silent utterance inside the tap handler fixes this. ── */
+let speechPrimed = false;
+function primeSpeechSynthesis() {
+  if (speechPrimed) return;
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;      // silent
+    u.rate = 1;
+    synth.speak(u);
+    speechPrimed = true;
+  } catch (_) { /* ignore */ }
+}
+
 /* ── Icons ── */
 function MicIcon({ active }) {
   const col = active ? "#ffffff" : "#c4b5fd";
@@ -111,11 +129,10 @@ function MicIcon({ active }) {
       <rect x="9" y="2" width="6" height="12" rx="3" fill={col}/>
       <path d="M5 11a7 7 0 0014 0" stroke={col} strokeWidth="2" strokeLinecap="round" fill="none"/>
       <line x1="12" y1="18" x2="12" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/>
-      <line x1="8"  y1="22" x2="16" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="8" y1="22" x2="16" y2="22" stroke={col} strokeWidth="2" strokeLinecap="round"/>
     </svg>
   );
 }
-
 function SpeakerIcon({ active }) {
   const col = active ? "#7c3aed" : "#a78bfa";
   return (
@@ -129,21 +146,20 @@ function SpeakerIcon({ active }) {
 
 /* ── Main component ── */
 function Translator() {
-  const [source, setSource]           = useState("en");
-  const [target, setTarget]           = useState("hu");
-  const [transcript, setTranscript]   = useState("");
+  const [source, setSource] = useState("en");
+  const [target, setTarget] = useState("hu");
+  const [transcript, setTranscript] = useState("");
   const [translation, setTranslation] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [isSpeaking, setIsSpeaking]   = useState(false);
-  const [error, setError]             = useState("");
-  const [supported, setSupported]     = useState(true);
-
-  const recognitionRef    = useRef(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [error, setError] = useState("");
+  const [supported, setSupported] = useState(true);
+  const recognitionRef = useRef(null);
   const lastTranscriptRef = useRef("");
-  const didTranslateRef   = useRef(false);
-  const sourceRef         = useRef(source);
-  const targetRef         = useRef(target);
+  const didTranslateRef = useRef(false);
+  const sourceRef = useRef(source);
+  const targetRef = useRef(target);
 
   useEffect(() => { sourceRef.current = source; }, [source]);
   useEffect(() => { targetRef.current = target; }, [target]);
@@ -158,9 +174,11 @@ function Translator() {
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = bcp; utt.rate = 0.92;
     utt.onstart = () => setIsSpeaking(true);
-    utt.onend   = () => setIsSpeaking(false);
+    utt.onend = () => setIsSpeaking(false);
     utt.onerror = () => setIsSpeaking(false);
-    synth.speak(utt);
+    // Tiny delay avoids a Chrome bug where cancel() immediately followed
+    // by speak() can drop the utterance.
+    setTimeout(() => synth.speak(utt), 60);
   }, []);
 
   const doTranslate = useCallback(async (text, src, tgt) => {
@@ -170,10 +188,10 @@ function Translator() {
     setIsTranslating(true); setError("");
     try {
       const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(punctuated)}&langpair=${LANG[src].mm}|${LANG[tgt].mm}`;
-      const res  = await fetch(url);
+      const res = await fetch(url);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      const out  = data?.responseData?.translatedText;
+      const out = data?.responseData?.translatedText;
       if (!out) throw new Error();
       setTranslation(out);
       speakText(out, LANG[tgt].bcp);
@@ -188,7 +206,7 @@ function Translator() {
     setError(""); setTranscript(""); setTranslation("");
     window.speechSynthesis.cancel();
     lastTranscriptRef.current = "";
-    didTranslateRef.current   = false;
+    didTranslateRef.current = false;
 
     const r = new SR();
     r.lang = LANG[sourceRef.current].bcp;
@@ -197,7 +215,7 @@ function Translator() {
     r.maxAlternatives = 1;
 
     r.onresult = (e) => {
-      const res  = e.results[e.resultIndex];
+      const res = e.results[e.resultIndex];
       const text = res[0].transcript;
       lastTranscriptRef.current = text;
       setTranscript(text);
@@ -216,7 +234,7 @@ function Translator() {
         doTranslate(lastTranscriptRef.current, sourceRef.current, targetRef.current);
       }
       lastTranscriptRef.current = "";
-      didTranslateRef.current   = false;
+      didTranslateRef.current = false;
     };
 
     recognitionRef.current = r;
@@ -228,6 +246,15 @@ function Translator() {
     recognitionRef.current?.stop();
     setIsListening(false);
   }, []);
+
+  /* Tap-to-toggle: one tap starts recording, another tap stops it.
+     Also primes speech synthesis on the very first tap so the first
+     translation gets spoken out loud. */
+  const handleMicTap = useCallback(() => {
+    primeSpeechSynthesis();
+    if (isListening) stopListening();
+    else startListening();
+  }, [isListening, startListening, stopListening]);
 
   const handleSourceChange = (e) => {
     if (isListening) stopListening();
@@ -280,6 +307,7 @@ function Translator() {
       : "0 8px 32px rgba(109,40,217,0.4)",
     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
     position: "relative", transition: "all 0.2s",
+    padding: 0,
   };
   const replayBtn = {
     display:"flex", alignItems:"center", gap:4,
@@ -298,10 +326,9 @@ function Translator() {
         <h1 style={{color:"white", fontSize:30, fontWeight:700, letterSpacing:"-0.5px"}}>Live Translator</h1>
         <p style={{color:"#a78bfa", marginTop:4, fontSize:14}}>Speak · Translate · Listen</p>
       </div>
-
       <div style={card}>
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"16px 24px", borderBottom:"1px solid rgba(255,255,255,0.1)", gap:8}}>
+                     padding:"16px 24px", borderBottom:"1px solid rgba(255,255,255,0.1)", gap:8}}>
           <div style={{display:"flex", flexDirection:"column", gap:3}}>
             <span style={{...lbl}}>From</span>
             <select value={source} onChange={handleSourceChange}>
@@ -334,7 +361,7 @@ function Translator() {
           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:18}}>
             <div style={lbl}>{t.flag} Translation</div>
             {translation && (
-              <button style={replayBtn} onClick={() => speakText(translation, t.bcp)}>
+              <button style={replayBtn} onClick={() => { primeSpeechSynthesis(); speakText(translation, t.bcp); }}>
                 <SpeakerIcon active={isSpeaking}/>
                 {isSpeaking ? "Playing…" : "Replay"}
               </button>
@@ -357,7 +384,7 @@ function Translator() {
 
         {error && (
           <div style={{margin:"12px 24px 0", padding:"10px 14px", borderRadius:12, fontSize:13,
-            background:"rgba(220,38,38,0.18)", border:"1px solid rgba(248,113,113,0.3)", color:"#fca5a5"}}>
+                       background:"rgba(220,38,38,0.18)", border:"1px solid rgba(248,113,113,0.3)", color:"#fca5a5"}}>
             {error}
           </div>
         )}
@@ -377,21 +404,20 @@ function Translator() {
                     }}/>
                   )}
                   <button
+                    type="button"
+                    aria-pressed={isListening}
+                    aria-label={isListening ? "Stop recording" : "Start recording"}
                     style={micBtn}
-                    onMouseDown={startListening}
-                    onMouseUp={stopListening}
-                    onTouchStart={(e)=>{e.preventDefault();startListening();}}
-                    onTouchEnd={(e)=>{e.preventDefault();stopListening();}}>
+                    onClick={handleMicTap}>
                     <MicIcon active={isListening}/>
                   </button>
                 </div>
                 <p style={{color:"#a78bfa", fontSize:14}}>
-                  {isListening ? "Release to stop" : `Tap & speak in ${s.label}`}
+                  {isListening ? "Tap to stop" : `Tap & speak in ${s.label}`}
                 </p>
               </>}
         </div>
       </div>
-
       <p style={{textAlign:"center", color:"rgba(139,92,246,0.5)", fontSize:11, marginTop:20}}>
         Powered by Web Speech API · MyMemory Translation
       </p>
